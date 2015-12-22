@@ -1,0 +1,31 @@
+"*":
+  welcome:
+    showOnStartup: false
+  core:
+    excludeVcsIgnoredPaths: false
+  editor:
+    preferredLineLength: 120
+    showIndentGuide: true
+    showInvisibles: true
+    invisibles: {}
+  linter:
+    showHighlighting: false
+    showErrorTabFile: false
+    showErrorTabProject: false
+    showErrorPanel: false
+    underlineIssues: false
+  "autocomplete-plus":
+    confirmCompletion: "tab"
+  autosave:
+    enabled: true
+  "file-icons":
+    onChanges: true
+  "git-projects":
+    sortBy: "Latest modification date"
+    maxDepth: 1
+  tabs:
+    enableVcsColoring: true
+  "highlight-selected":
+    onlyHighlightWholeWords: true
+    hideHighlightOnSelectedWord: true
+    highlightBackground: true

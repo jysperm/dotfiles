@@ -1,1 +1,5 @@
-# Environment
+# Environments
+
+## Atom
+
+    cp atom ~/.atom

@@ -1,0 +1,4 @@
+'.source.coffee':
+  'Inspect':
+    'prefix': 'inspect'
+    'body': "console.log require('util').inspect $1, {depth: null}"
