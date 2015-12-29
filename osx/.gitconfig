@@ -1,0 +1,7 @@
+[core]
+	excludesfile = /Users/jysperm/.gitignore
+[user]
+  name = jysperm
+  email = jysperm@gmail.com
+[push]
+  default = simple
