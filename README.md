@@ -7,7 +7,7 @@ Jysperm's some configuration files and guide about install development Environme
 
 ## Git
 
-    cp windows/.gitconfig ~/.gitconfig
+    cp {windows/osx/linux}/.gitconfig ~/.gitconfig
     cp .gitignore ~/.gitignore
 
 ## Coffeelint
