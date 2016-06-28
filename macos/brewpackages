@@ -1,0 +1,6 @@
+gnupg2 2.0.30
+mysql 5.7.13
+node 6.2.2
+openssl 1.0.2h
+proxychains-ng 4.11
+redis 3.2.1
