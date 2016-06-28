@@ -10,8 +10,4 @@
 
 ## Quip <https://quip.com>
 
-## Nylas N1 <https://www.nylas.com/n1>
-
-## Source Tree <https://www.sourcetreeapp.com>
-
 ## Rime <http://rime.im>
