@@ -3,5 +3,6 @@
 [user]
   name = jysperm
   email = jysperm@gmail.com
+	signingkey = E466CF1E!
 [push]
   default = simple
