@@ -11,3 +11,7 @@
 ## Quip <https://quip.com>
 
 ## Rime <http://rime.im>
+
+## GitKraken <https://www.gitkraken.com/>
+
+## GunPG <https://www.gnupg.org/>
