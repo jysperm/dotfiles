@@ -6,10 +6,12 @@
 
 ## Vagrant <https://www.vagrantup.com>
 
-## Robomongo <http://robomongo.org>
-
 ## Quip <https://quip.com>
 
 ## Rime <http://rime.im>
 
 ## GitKraken <https://www.gitkraken.com>
+
+## Syncthing <https://syncthing.net>
+
+## Mongotron <http://mongotron.io/>
