@@ -1,2 +1,9 @@
 'atom-workspace':
-  'ctrl-alt-o': 'git-projects:toggle'
+  'ctrl-l': 'markdown:paste-as-link'
+  'ctrl-m ctrl-l': 'markdown:paste-as-link'
+  'alt-cmd-o': 'project-manager:list-projects'
+
+'atom-text-editor':
+  'cmd-e': 'editor:select-larger-syntax-node'
+  'shift-cmd-e': 'editor:select-smaller-syntax-node'
+  'cmd-g': 'git-diff:toggle-diff-list'

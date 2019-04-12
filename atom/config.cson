@@ -1,17 +1,35 @@
 "*":
+  "atom-ide-ui":
+    "atom-ide-code-format":
+      formatOnSave: false
+      formatOnType: false
   "autocomplete-plus":
     confirmCompletion: "tab"
   autosave:
     enabled: true
   core:
-    excludeVcsIgnoredPaths: false
+    customFileTypes:
+      "source.ledger": [
+        "bean"
+      ]
+      "source.yaml": [
+        "raml"
+      ]
+    projectHome: "/Users/jysperm/jysperm, /Users/jysperm/LeanCloud, /Users/jysperm/GitHub"
+    titleBar: "custom"
+  date:
+    dateFormat: "YYYY-MM-DD"
   editor:
+    fontFamily: "Fira Code"
     invisibles: {}
     preferredLineLength: 120
+    scrollPastEnd: true
     showIndentGuide: true
     showInvisibles: true
   "file-icons":
     onChanges: true
+  "find-and-replace":
+    autocompleteSearches: true
   "git-projects":
     sortBy: "Latest modification date"
     maxDepth: 1
@@ -19,13 +37,31 @@
     hideHighlightOnSelectedWord: true
     highlightBackground: true
     onlyHighlightWholeWords: true
+  "project-manager":
+    includeGitRepositories: true
+    sortBy: "last modified"
+  "spell-check":
+    addKnownWords: true
+    knownWords: [
+      "Kubernetes"
+    ]
   linter:
     showErrorPanel: false
     showErrorTabFile: false
     showErrorTabProject: false
     showHighlighting: false
     underlineIssues: false
+  "tree-view":
+    squashDirectoryNames: true
   tabs:
     enableVcsColoring: true
   welcome:
     showOnStartup: false
+".go.source":
+  "atom-ide-ui":
+    "atom-ide-code-format":
+      formatOnSave: true
+      formatOnType: false
+".html.php.text":
+  editor:
+    tabLength: 4
