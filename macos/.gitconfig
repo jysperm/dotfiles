@@ -6,3 +6,5 @@
 	signingkey = E466CF1E!
 [push]
   default = simple
+[alias]
+  hl = !git --no-pager log --graph --color --abbrev-commit --decorate --date=relative --pretty=oneline --all | emojify | less --RAW-CONTROL-CHARS
