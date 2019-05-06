@@ -1,0 +1,15 @@
+ServerAliveInterval 60
+
+# https://en.wikibooks.org/wiki/OpenSSH/Cookbook/Multiplexing
+ControlPath ~/.ssh/controlmasters/%r@%h:%p
+ControlMaster auto
+ControlPersist 60m
+
+ForwardAgent yes
+AddKeysToAgent yes
+
+Include ~/LeanCloud/op/ssh_config
+Include ~/jysperm/playbooks/ssh_config
+
+Host github.com
+  ProxyCommand corkscrew 127.0.0.1 8118 %h %p

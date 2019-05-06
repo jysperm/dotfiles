@@ -5,6 +5,7 @@ cli53 0.8.14
 composer 1.8.4
 corkscrew 2.0
 dep 0.5.1
+dpkg 1.19.5
 elasticsearch 6.6.1
 emojify 1.0.2
 etcd 3.3.12
@@ -12,7 +13,6 @@ ethereum 1.8.22
 gettext 0.19.8.1
 gnupg 2.2.13
 go 1.12
-gpg-agent 2.0.31
 graphviz 2.40.1
 htop 2.2.0_1
 imagemagick 7.0.8-33

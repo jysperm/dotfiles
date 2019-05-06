@@ -18,3 +18,5 @@ npm-debug.log
 
 .remote-sync.json
 .tern-project
+
+package-lock.json
