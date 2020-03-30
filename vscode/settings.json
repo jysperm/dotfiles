@@ -1,0 +1,27 @@
+{
+    "editor.fontFamily": "FiraCode-Retina",
+    "files.autoSave": "onFocusChange",
+    "editor.renderWhitespace": "boundary",
+    "window.zoomLevel": 1,
+    "[json]": {
+        "editor.tabSize": 2
+    },
+    "[typescript]": {
+        "editor.tabSize": 2
+    },
+    "[yaml]": {
+        "editor.tabSize": 2
+    },
+    "explorer.autoReveal": false,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "editor.fontLigatures": true,
+    "typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": false,
+    "typescript.format.semicolons": "remove",
+    "typescript.preferences.quoteStyle": "single",
+    "gitlens.codeLens.enabled": false,
+    "diffEditor.renderSideBySide": false,
+    "git.autofetch": true,
+    "go.toolsGopath": "/Users/jysperm/Golang",
+    "go.useLanguageServer": true
+}
