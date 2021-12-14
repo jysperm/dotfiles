@@ -5,16 +5,21 @@ tap "homebrew/cask-versions"
 tap "homebrew/core"
 tap "homebrew/services"
 brew "ansible"
+brew "awscli"
+brew "bpytop"
 brew "glib"
 brew "certbot"
 brew "dep"
 brew "dog"
 brew "emojify"
-brew "unbound"
+brew "unbound", restart_service: true
 brew "gnupg"
 brew "gobject-introspection"
+brew "python@3.8"
+brew "harfbuzz"
 brew "graphviz"
 brew "htop"
+brew "libheif"
 brew "imagemagick"
 brew "iperf3"
 brew "ipfs", restart_service: true
@@ -23,7 +28,7 @@ brew "lean-cli"
 brew "less"
 brew "mas"
 brew "mtr"
-brew "mysql"
+brew "mysql", restart_service: true
 brew "neofetch"
 brew "nmap"
 brew "node"
@@ -32,35 +37,49 @@ brew "pass"
 brew "pinentry-mac"
 brew "smartmontools"
 brew "socat"
+brew "squirrel", link: false
 brew "ssh-copy-id"
+brew "starship"
 brew "sysbench"
 brew "telnet"
 brew "websocat"
 brew "wget"
 brew "wrk"
+brew "yarn"
+brew "zsh-autosuggestions"
+brew "zsh-syntax-highlighting"
 cask "aerial"
 cask "bitbar"
 cask "brave-browser"
 cask "caffeine"
 cask "clashx"
+cask "discord"
 cask "docker"
 cask "downie"
 cask "firefox"
 cask "font-fira-code"
+cask "font-fira-code-nerd-font"
+cask "font-noto-emoji"
 cask "gitup"
 cask "google-chrome"
 cask "handbrake"
 cask "iina"
 cask "intel-power-gadget"
+cask "iterm2"
+cask "logseq"
 cask "netnewswire"
 cask "obs"
 cask "paw"
 cask "pock"
 cask "scroll-reverser"
+cask "sketch"
+cask "slack"
 cask "softu2f"
 cask "squirrel"
 cask "steam"
 cask "telegram"
+cask "tg-pro"
+cask "utm"
 cask "visual-studio-code"
 cask "zulip"
 mas "Affinity Photo", id: 824183456
@@ -68,13 +87,12 @@ mas "Bitwarden", id: 1352778147
 mas "Final Cut Pro", id: 424389933
 mas "GarageBand", id: 682658836
 mas "iMovie", id: 408981434
+mas "Infuse", id: 1136220934
 mas "Keynote", id: 409183694
 mas "Medis", id: 1063631769
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
 mas "QQ", id: 451108668
-mas "Reeder", id: 1449412482
-mas "Ulysses", id: 1225570693
 mas "WeChat", id: 836500024
 mas "WireGuard", id: 1451685025
 mas "Xcode", id: 497799835
