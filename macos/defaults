@@ -3,3 +3,4 @@ defaults write com.apple.Photos AppleLanguages -array zh_CN
 defaults write com.apple.FinalCut AppleLanguages -array zh_CN
 defaults write com.colliderli.iina AppleLanguages -array zh_CN
 defaults write com.tencent.qq AppleLanguages -array zh_CN
+defaults write com.apple.desktopservices DSDontWriteNetworkStores true
