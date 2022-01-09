@@ -1,15 +1,15 @@
 bower_components
 node_modules
+
 .vagrant
+.vscode
 .idea
 .git
 
 Thumbs.db
 Desktop.ini
-
 .DS_Store
 ._*
-
 *.un~
 *~
 
