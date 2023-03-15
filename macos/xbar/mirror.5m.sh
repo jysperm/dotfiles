@@ -9,6 +9,12 @@ if [[ "$1" = "toggle" ]]; then
     mirror
 fi
 
-echo "Mirror: $(mirror -q)"
+OUTPUT=$(mirror -q)
+
+if [[ "$OUTPUT" == "No secondary display"* ]]; then
+  OUTPUT='N/A'
+fi
+
+echo "Mirror: ${OUTPUT}"
 echo "---"
 echo "Toggle | shell=${0} param1=toggle refresh=true"
