@@ -1,11 +1,5 @@
 {
-  "Link Color" : {
-    "Red Component" : 0.19802422821521759,
-    "Color Space" : "sRGB",
-    "Blue Component" : 0.9337158203125,
-    "Alpha Component" : 1,
-    "Green Component" : 0.55789834260940552
-  },
+  "Guid" : "700A8101-7CAD-4CAE-A3DC-4530C384BBEC",
   "Tags" : [
 
   ],
@@ -16,6 +10,13 @@
     "Alpha Component" : 1,
     "Green Component" : 0.67044717073440552
   },
+  "Link Color" : {
+    "Red Component" : 0.19802422821521759,
+    "Color Space" : "sRGB",
+    "Blue Component" : 0.9337158203125,
+    "Alpha Component" : 1,
+    "Green Component" : 0.55789834260940552
+  },
   "Ansi 7 Color" : {
     "Red Component" : 0.7810397744178772,
     "Color Space" : "sRGB",
@@ -23,19 +24,19 @@
     "Alpha Component" : 1,
     "Green Component" : 0.78105825185775757
   },
-  "Ansi 8 Color" : {
-    "Red Component" : 0.40781760215759277,
-    "Color Space" : "sRGB",
-    "Blue Component" : 0.4078223705291748,
-    "Alpha Component" : 1,
-    "Green Component" : 0.40782788395881653
-  },
   "Bold Color" : {
     "Red Component" : 0.99999600648880005,
     "Color Space" : "sRGB",
     "Blue Component" : 1,
     "Alpha Component" : 1,
     "Green Component" : 1
+  },
+  "Ansi 8 Color" : {
+    "Red Component" : 0.40781760215759277,
+    "Color Space" : "sRGB",
+    "Blue Component" : 0.4078223705291748,
+    "Alpha Component" : 1,
+    "Green Component" : 0.40782788395881653
   },
   "Ansi 9 Color" : {
     "Red Component" : 0.8659515380859375,
@@ -45,9 +46,9 @@
     "Green Component" : 0.47524076700210571
   },
   "Horizontal Spacing" : 1,
-  "Right Option Key Sends" : 0,
   "Rows" : 25,
   "Default Bookmark" : "No",
+  "Right Option Key Sends" : 0,
   "Cursor Guide Color" : {
     "Red Component" : 0.70213186740875244,
     "Color Space" : "sRGB",
@@ -114,6 +115,7 @@
   },
   "Custom Command" : "No",
   "ASCII Anti Aliased" : true,
+  "Custom Locale" : "en_US.UTF-8",
   "Non Ascii Font" : "Monaco 12",
   "Vertical Spacing" : 1,
   "Use Bold Font" : true,
@@ -374,6 +376,7 @@
     "Alpha Component" : 1,
     "Green Component" : 0.26474356651306152
   },
+  "Set Local Environment Vars" : 2,
   "Ansi 5 Color" : {
     "Red Component" : 0.752197265625,
     "Color Space" : "sRGB",
@@ -382,6 +385,7 @@
     "Green Component" : 0.24931684136390686
   },
   "Use Non-ASCII Font" : false,
+  "Normal Font" : "FiraCodeNFM-Reg 14",
   "Ansi 6 Color" : {
     "Red Component" : 0,
     "Color Space" : "sRGB",
@@ -389,7 +393,6 @@
     "Alpha Component" : 1,
     "Green Component" : 0.77425903081893921
   },
-  "Normal Font" : "FiraCodeNerdFontCompleteM-Regular 14",
   "Custom Directory" : "No",
   "Ansi 0 Color" : {
     "Red Component" : 0.078431375324726105,
@@ -397,6 +400,5 @@
     "Blue Component" : 0.11764705926179886,
     "Alpha Component" : 1,
     "Green Component" : 0.098039217293262482
-  },
-  "Guid" : "700A8101-7CAD-4CAE-A3DC-4530C384BBEC"
+  }
 }

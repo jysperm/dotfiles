@@ -8,7 +8,6 @@ ControlPersist 60m
 ForwardAgent yes
 AddKeysToAgent yes
 
-Include ~/LeanCloud/op/ssh_config
 Include ~/jysperm/playbooks/ssh_config
 
 Host github.com

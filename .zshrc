@@ -12,4 +12,6 @@ alias ll='ls -lah'
 
 zstyle -e ':completion:*:default' list-colors 'reply=("${PREFIX:+=(#bi)($PREFIX:t)(?)*==02=01}:${(s.:.)LS_COLORS}")'
 
+setopt HIST_IGNORE_SPACE
+
 export CLICOLOR=1

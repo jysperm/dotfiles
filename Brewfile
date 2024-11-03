@@ -109,8 +109,8 @@ cask "zed"
 cask "zoom"
 mas "Affinity Photo", id: 824183456
 mas "Bitwarden", id: 1352778147
+mas "Coffee Buzz", id: 1099454186
 mas "Final Cut Pro", id: 424389933
-mas "GarageBand", id: 682658836
 mas "iMovie", id: 408981434
 mas "Infuse", id: 1136220934
 mas "Keynote", id: 409183694

@@ -1,5 +1,5 @@
 {
-    "editor.fontFamily": "FiraCode-Retina",
+    "editor.fontFamily": "FiraCode Nerd Font Mono",
     "files.autoSave": "onFocusChange",
     "editor.renderWhitespace": "boundary",
     "window.zoomLevel": 1,
@@ -22,6 +22,6 @@
     "gitlens.codeLens.enabled": false,
     "diffEditor.renderSideBySide": false,
     "git.autofetch": true,
-    "go.toolsGopath": "/Users/jysperm/Golang",
+    "go.toolsGopath": "/Users/jysperm/Go",
     "go.useLanguageServer": true
 }
