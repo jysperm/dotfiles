@@ -8,3 +8,5 @@
   default = simple
 [alias]
   hl = !git --no-pager log --graph --color --abbrev-commit --decorate --date=relative --pretty=oneline --all | emojify | less --RAW-CONTROL-CHARS
+  wips = !(git stash -u | grep -qv 'No local changes to save' || (echo 'No local changes to save' && false)) && git stash show stash@{0} && (git push origin stash@{0}:refs/stashes/wip || (git stash pop && false)) && git stash drop -q
+  wipl = !git fetch origin refs/stashes/wip && git stash apply FETCH_HEAD && git push -qd origin refs/stashes/wip
