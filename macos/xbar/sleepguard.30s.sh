@@ -28,7 +28,7 @@
 #   1. Reason section      — the title spelled out: what keeps it running / when
 #                            it sleeps, plus a lid-close note where useful.
 #   2. Info section        — neutral state dump: power source, external display,
-#                            lid, and any process holding sleep open.
+#                            and any process holding sleep open.
 #   3. Keep-awake control  — single caffeinate on/off toggle, independent of mode.
 #   4. Extra actions       — open Battery settings, dump full pmset assertions.
 #
@@ -113,9 +113,22 @@ EXT_NAMES=$(echo "$SPD" | awk '
 END { for (i=1;i<=c;i++) if (!intl[order[i]]) { if (out) out=out", "; out=out order[i] } print out }
 ')
 
-# Idle system sleep timer (minutes; 0 = never)
+# Idle-to-sleep time. The system can't idle-sleep while the display is on, so the
+# real wait before sleep is max(sleep, displaysleep) — both timers run off the same
+# idle clock. A 0 in EITHER means "never": sleep=0 disables system sleep; and with
+# displaysleep=0 the display never turns off, so the system never idle-sleeps.
+# IDLE_SLEEP is the effective minutes (0 = never, "?" = unknown).
 SLEEP=$(getlive sleep)
-[ -z "$SLEEP" ] && SLEEP="?"
+DISPLAYSLEEP=$(getlive displaysleep)
+if [ -z "$SLEEP" ] || [ -z "$DISPLAYSLEEP" ]; then
+    IDLE_SLEEP="?"
+elif [ "$SLEEP" = "0" ] || [ "$DISPLAYSLEEP" = "0" ]; then
+    IDLE_SLEEP="0"
+elif [ "$SLEEP" -ge "$DISPLAYSLEEP" ]; then
+    IDLE_SLEEP="$SLEEP"
+else
+    IDLE_SLEEP="$DISPLAYSLEEP"
+fi
 
 # Lid state (from ioreg): AppleClamshellState — Yes = lid closed, No = lid open.
 # A direct hardware state, reliable.
@@ -137,33 +150,64 @@ fi
 # We only care about two kinds:
 #   KEEP_APPS   — persistent keep-awake tools (caffeinate, Amphetamine, ...)
 #   AUDIO_HELD  — coreaudiod (audio device in use)
-# Assertions held only "while the display is on" are ignored: they release when
-# the display sleeps (i.e. when you walk away), so they don't keep idle sleep off.
+# Two kinds are ignored because they won't actually keep the Mac awake if you
+# walk away:
+#   - assertions held only "while the display is on" (they release when the
+#     display sleeps, i.e. when you walk away);
+#   - a caffeinate whose timeout (caffeinate -t) fires before idle sleep would —
+#     it releases before the machine would have slept anyway, so it changes
+#     nothing, and these short-lived caffeinates would otherwise cause flicker.
+# awk emits one record per assertion as "pname|desc|timeout_secs".
 # ============================================================================
 KEEPAWAKE_RE='Coffee Buzz|Amphetamine|Caffeine|KeepingYouAwake|caffeinate|Lungo|Theine|Owly|Wimoweh|NoSleep|Jiggler|Aerial|Caffeinated|Anti-Sleep'
 
 KEEP_APPS=""      # newline-separated process names of active keep-awake tools
 AUDIO_HELD=0
 
-while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    pname=$(echo "$line" | sed -E 's/.*pid [0-9]+\(([^)]*)\).*/\1/')
-    desc=$(echo "$line"  | sed -E 's/.*named: "([^"]*)".*/\1/')
+# Effective idle-sleep window in seconds, or 0 when idle sleep never fires /
+# is unknown (in which case the caffeinate-timeout filter is skipped).
+if [ "$IDLE_SLEEP" != "0" ] && [ "$IDLE_SLEEP" != "?" ]; then
+    IDLE_SLEEP_SECS=$((IDLE_SLEEP * 60))
+else
+    IDLE_SLEEP_SECS=0
+fi
+
+while IFS='|' read -r pname desc tmo; do
+    [ -z "$pname" ] && continue
     echo "$desc" | grep -qi "display is on" && continue
     if echo "$pname" | grep -qiE "$KEEPAWAKE_RE"; then
+        # Ignore a caffeinate that will time out before idle sleep would fire.
+        if [ "$pname" = "caffeinate" ] && [ -n "$tmo" ] \
+           && [ "$IDLE_SLEEP_SECS" -gt 0 ] && [ "$tmo" -lt "$IDLE_SLEEP_SECS" ]; then
+            continue
+        fi
         KEEP_APPS="$KEEP_APPS$pname
 "
     elif [ "$pname" = "coreaudiod" ]; then
         AUDIO_HELD=1
     fi
-done <<< "$(echo "$ASSERT" | grep "SystemSleep named:")"
+done <<< "$(echo "$ASSERT" | awk '
+/pid [0-9]+\(.*\): .*named:/ {
+    if (have) print pname "|" desc "|" tmo
+    have=1; tmo=""
+    pname=$0; sub(/.*pid [0-9]+\(/, "", pname); sub(/\).*/, "", pname)
+    desc=$0;  sub(/.*named: "/, "", desc);      sub(/".*/, "", desc)
+    next
+}
+/Timeout will fire in [0-9]+ secs/ {
+    t=$0; sub(/.*Timeout will fire in /, "", t); sub(/ secs.*/, "", t); tmo=t
+}
+END { if (have) print pname "|" desc "|" tmo }
+')"
 
 # Short phrase for why idle sleep is held off (also: non-empty = "kept awake").
 STAY_WHY=""
 if [ "$SLEEP" = "0" ]; then
     STAY_WHY="idle sleep is disabled"
+elif [ "$DISPLAYSLEEP" = "0" ]; then
+    STAY_WHY="display sleep disabled"
 elif [ -n "$KEEP_APPS" ]; then
-    STAY_WHY="kept awake by \"$(echo "$KEEP_APPS" | head -1)\""
+    STAY_WHY="kept awake by $(echo "$KEEP_APPS" | head -1)"
 elif [ "$AUDIO_HELD" = "1" ]; then
     STAY_WHY="audio is in use"
 fi
@@ -215,7 +259,7 @@ case "$MODE" in
         ;;
     B)
         echo "💤 Will sleep"
-        REASON="💤 Sleeps after ~${SLEEP} min idle"
+        REASON="💤 Sleeps after ${IDLE_SLEEP} min idle"
         ;;
     C)
         echo "⚠️ Sleeps on close"
@@ -237,8 +281,6 @@ if [ "$EXT_DISPLAY" = "yes" ]; then
 else
     echo "No external display"
 fi
-echo "Lid: $([ "$LID" = "Yes" ] && echo "Closed" || echo "Open")"
-
 # Processes holding idle sleep open, if any (duplicates kept on purpose — e.g.
 # two caffeinate processes is worth seeing).
 HOLD_NAMES=$(echo "$KEEP_APPS" | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')
