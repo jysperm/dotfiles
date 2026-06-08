@@ -28,7 +28,8 @@
 #   1. Reason section      — the title spelled out: what keeps it running / when
 #                            it sleeps, plus a lid-close note where useful.
 #   2. Info section        — neutral state dump: power source, external display,
-#                            and any process holding sleep open.
+#                            and what's holding sleep open — the permanent holders
+#                            if any, otherwise the temporary ones (flagged).
 #   3. Keep-awake control  — single caffeinate on/off toggle, independent of mode.
 #   4. Extra actions       — open Battery settings, dump full pmset assertions.
 #
@@ -146,70 +147,67 @@ else
 fi
 
 # ============================================================================
-# Parse sleep-preventing assertions to see what is holding idle sleep open.
-# We only care about two kinds:
-#   KEEP_APPS   — persistent keep-awake tools (caffeinate, Amphetamine, ...)
-#   AUDIO_HELD  — coreaudiod (audio device in use)
-# Two kinds are ignored because they won't actually keep the Mac awake if you
-# walk away:
-#   - assertions held only "while the display is on" (they release when the
-#     display sleeps, i.e. when you walk away);
-#   - a caffeinate whose timeout (caffeinate -t) fires before idle sleep would —
-#     it releases before the machine would have slept anyway, so it changes
-#     nothing, and these short-lived caffeinates would otherwise cause flicker.
-# awk emits one record per assertion as "pname|desc|timeout_secs".
+# Parse system-sleep assertions and split the holders into:
+#   PERM_HOLDERS — keep the Mac awake indefinitely, so walking away is safe:
+#                  a caffeinate with no timeout and no command to wait on, plus
+#                  known keep-awake apps (Amphetamine, Coffee Buzz, ...).
+#   TEMP_HOLDERS — release on their own, so the Mac still sleeps if you leave:
+#                  a timed / command-wrapping caffeinate, audio (coreaudiod), and
+#                  any other process holding system sleep open.
+# Only PERM_HOLDERS count as "staying awake". Assertions held merely "while the
+# display is on" are dropped entirely — they are the display gate, not a holder,
+# and are already folded into the idle-sleep timer. awk emits "pid|pname|desc".
 # ============================================================================
 KEEPAWAKE_RE='Coffee Buzz|Amphetamine|Caffeine|KeepingYouAwake|caffeinate|Lungo|Theine|Owly|Wimoweh|NoSleep|Jiggler|Aerial|Caffeinated|Anti-Sleep'
 
-KEEP_APPS=""      # newline-separated process names of active keep-awake tools
-AUDIO_HELD=0
+PERM_HOLDERS=""   # newline-separated process names (indefinite holders)
+TEMP_HOLDERS=""   # newline-separated process names (self-releasing holders)
 
-# Effective idle-sleep window in seconds, or 0 when idle sleep never fires /
-# is unknown (in which case the caffeinate-timeout filter is skipped).
-if [ "$IDLE_SLEEP" != "0" ] && [ "$IDLE_SLEEP" != "?" ]; then
-    IDLE_SLEEP_SECS=$((IDLE_SLEEP * 60))
-else
-    IDLE_SLEEP_SECS=0
-fi
+# A caffeinate is permanent only if its args carry no timeout (-t), no
+# wait-for-pid (-w) and no trailing command — i.e. only boolean flags. If the
+# process is already gone, treat it as temporary (don't claim "staying awake").
+caffeinate_is_permanent() {
+    local args
+    args=$(ps -p "$1" -o args= 2>/dev/null)
+    [ -z "$args" ] && { echo "no"; return; }
+    echo "$args" | awk '{
+        for (i = 2; i <= NF; i++) {
+            if ($i !~ /^-/)  { print "no"; exit }   # a command/value -> bounded
+            if ($i ~ /[tw]/) { print "no"; exit }   # -t timeout or -w wait-pid
+        }
+        print "yes"
+    }'
+}
 
-while IFS='|' read -r pname desc tmo; do
+while IFS='|' read -r pid pname desc; do
     [ -z "$pname" ] && continue
     echo "$desc" | grep -qi "display is on" && continue
-    if echo "$pname" | grep -qiE "$KEEPAWAKE_RE"; then
-        # Ignore a caffeinate that will time out before idle sleep would fire.
-        if [ "$pname" = "caffeinate" ] && [ -n "$tmo" ] \
-           && [ "$IDLE_SLEEP_SECS" -gt 0 ] && [ "$tmo" -lt "$IDLE_SLEEP_SECS" ]; then
-            continue
-        fi
-        KEEP_APPS="$KEEP_APPS$pname
+    if echo "$pname" | grep -qiE "$KEEPAWAKE_RE" \
+       && ! { [ "$pname" = "caffeinate" ] && [ "$(caffeinate_is_permanent "$pid")" != "yes" ]; }; then
+        PERM_HOLDERS="$PERM_HOLDERS$pname
 "
-    elif [ "$pname" = "coreaudiod" ]; then
-        AUDIO_HELD=1
+    else
+        TEMP_HOLDERS="$TEMP_HOLDERS$pname
+"
     fi
 done <<< "$(echo "$ASSERT" | awk '
-/pid [0-9]+\(.*\): .*named:/ {
-    if (have) print pname "|" desc "|" tmo
-    have=1; tmo=""
-    pname=$0; sub(/.*pid [0-9]+\(/, "", pname); sub(/\).*/, "", pname)
-    desc=$0;  sub(/.*named: "/, "", desc);      sub(/".*/, "", desc)
-    next
+/pid [0-9]+\(.*\): .*SystemSleep named:/ {
+    pid=$0;   sub(/^[[:space:]]*pid /, "", pid);           sub(/\(.*/, "", pid)
+    pname=$0; sub(/^[[:space:]]*pid [0-9]+\(/, "", pname); sub(/\).*/, "", pname)
+    desc=$0;  sub(/.*named: "/, "", desc);                 sub(/".*/, "", desc)
+    print pid "|" pname "|" desc
 }
-/Timeout will fire in [0-9]+ secs/ {
-    t=$0; sub(/.*Timeout will fire in /, "", t); sub(/ secs.*/, "", t); tmo=t
-}
-END { if (have) print pname "|" desc "|" tmo }
 ')"
 
-# Short phrase for why idle sleep is held off (also: non-empty = "kept awake").
+# Short phrase for why the Mac will stay awake (also: non-empty = "staying
+# awake"). Only permanent holders / disabled timers count here.
 STAY_WHY=""
 if [ "$SLEEP" = "0" ]; then
     STAY_WHY="idle sleep is disabled"
 elif [ "$DISPLAYSLEEP" = "0" ]; then
     STAY_WHY="display sleep disabled"
-elif [ -n "$KEEP_APPS" ]; then
-    STAY_WHY="kept awake by $(echo "$KEEP_APPS" | head -1)"
-elif [ "$AUDIO_HELD" = "1" ]; then
-    STAY_WHY="audio is in use"
+elif [ -n "$PERM_HOLDERS" ]; then
+    STAY_WHY="kept awake by $(echo "$PERM_HOLDERS" | head -1)"
 fi
 
 # Reason phrase shown in the "keep running" line. If our own caffeinate toggle is
@@ -281,11 +279,18 @@ if [ "$EXT_DISPLAY" = "yes" ]; then
 else
     echo "No external display"
 fi
-# Processes holding idle sleep open, if any (duplicates kept on purpose — e.g.
-# two caffeinate processes is worth seeing).
-HOLD_NAMES=$(echo "$KEEP_APPS" | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')
-[ "$AUDIO_HELD" = "1" ] && HOLD_NAMES="${HOLD_NAMES:+$HOLD_NAMES, }coreaudiod"
-[ -n "$HOLD_NAMES" ] && echo "Holding awake by: $HOLD_NAMES"
+# Holders of system sleep. Prefer the permanent ones (what actually keeps it
+# awake); only when there are none do we surface the temporary ones, flagged as
+# such since they don't survive you walking away. Duplicates are kept on purpose
+# (e.g. two caffeinate processes is worth seeing).
+join_holders() { echo "$1" | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }'; }
+PERM_LIST=$(join_holders "$PERM_HOLDERS")
+TEMP_LIST=$(join_holders "$TEMP_HOLDERS")
+if [ -n "$PERM_LIST" ]; then
+    echo "Holding awake by: $PERM_LIST"
+elif [ -n "$TEMP_LIST" ]; then
+    echo "Temporarily held by: $TEMP_LIST"
+fi
 
 # ============================================================================
 # Keep-awake control — single on/off toggle, independent of mode
