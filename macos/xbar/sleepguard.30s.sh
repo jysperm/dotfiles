@@ -250,10 +250,16 @@ case "$MODE" in
     A)
         echo "🟢 Staying awake"
         REASON="🟢 Background apps keep running${AWAKE_WHY:+ ($AWAKE_WHY)}"
-        # A lid that would sleep is classified as Mode C, so in Mode A closing
-        # the (open) lid is always clamshell-safe.
-        [ "$LID" = "No" ] && REASON="$REASON
+        # A lid that would sleep is classified as Mode C, so in Mode A the lid is
+        # always clamshell-safe: open -> a forward-looking note, closed -> confirm
+        # it's currently running with the lid shut.
+        if [ "$LID" = "No" ]; then
+            REASON="$REASON
 🟢 Closing the lid also keeps it running"
+        else
+            REASON="$REASON
+🟢 Running with the lid closed"
+        fi
         ;;
     B)
         echo "💤 Will sleep"
