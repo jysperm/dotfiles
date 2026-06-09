@@ -35,10 +35,12 @@
 #
 # Clamshell note
 #   Whether closing the lid sleeps the Mac (CLAM_SLEEP) is derived from Apple's
-#   closed-display-mode requirement — an external display AND power must both be
-#   present, else the lid sleeps. We do NOT read ioreg AppleClamshellCausesSleep:
-#   while the lid is open it tracks transient display-on state and flip-flops, so
-#   it mispredicts what closing the lid will do.
+#   closed-display-mode requirement: an external display is always required, and
+#   power too — but only on Intel. Apple's docs list a power adapter as required,
+#   yet Apple Silicon (M-series) Macs are widely tested to stay running clamshell
+#   on battery, so we drop the power condition there. We do NOT read ioreg
+#   AppleClamshellCausesSleep: while the lid is open it tracks transient display-on
+#   state and flip-flops, so it mispredicts what closing the lid will do.
 # ============================================================================
 
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -101,6 +103,14 @@ clamval()  { echo "$IOREG" | grep "\"$1\"" | head -1 | sed -E 's/.*= //' | tr -d
 # Power source
 if echo "$BATT" | grep -q "'AC Power'"; then SRC="AC"; else SRC="BATT"; fi
 
+# CPU architecture. Apple Silicon (arm64) relaxes the clamshell power requirement
+# (see the clamshell logic below); Intel still needs AC to run with the lid shut.
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then
+    ARCH="Apple Silicon"
+else
+    ARCH="Intel"
+fi
+
 # External display: any display that is not the built-in one. EXT_DISPLAY (yes/no)
 # drives the clamshell logic; EXT_NAMES holds the external display name(s) for the
 # info label. A display block is internal iff it has "Connection Type: Internal".
@@ -137,10 +147,12 @@ LID=$(clamval AppleClamshellState)
 [ -z "$LID" ] && LID="No"
 
 # Will closing the lid force sleep? Derived from Apple's closed-display-mode
-# requirement: needs an external display AND power, else the lid sleeps. (We avoid
-# ioreg AppleClamshellCausesSleep — it flip-flops while the lid is open; see the
-# clamshell note in the header.)
-if [ "$EXT_DISPLAY" = "yes" ] && [ "$SRC" = "AC" ]; then
+# requirement: always needs an external display; needs power too on Intel, but not
+# on Apple Silicon (Apple still officially lists power as required, yet M-series
+# Macs are widely tested to stay running clamshell on battery). Otherwise the lid
+# sleeps. (We avoid ioreg AppleClamshellCausesSleep — it flip-flops while the lid
+# is open; see the clamshell note in the header.)
+if [ "$EXT_DISPLAY" = "yes" ] && { [ "$SRC" = "AC" ] || [ "$ARCH" = "Apple Silicon" ]; }; then
     CLAM_SLEEP="No"   # closed-display (clamshell) mode keeps it running
 else
     CLAM_SLEEP="Yes"  # closing the lid sleeps
@@ -279,7 +291,7 @@ echo "$REASON"
 # Info section — neutral state, same set in every mode
 # ============================================================================
 echo "---"
-echo "Power: $([ "$SRC" = "AC" ] && echo "AC" || echo "Battery")"
+echo "Power: $([ "$SRC" = "AC" ] && echo "AC" || echo "Battery") ($ARCH)"
 if [ "$EXT_DISPLAY" = "yes" ]; then
     echo "External display: ${EXT_NAMES:-connected}"
 else
