@@ -219,21 +219,21 @@ else
 fi
 
 # ============================================================================
-# Decide the mode
-#   lid closed in clamshell mode (external display + power) -> A (keeps running)
-#     (lid closed otherwise means the Mac is asleep and not rendering this menu)
-#   lid open, kept awake: clamshell sleeps -> C (the lid is the one thing that
-#                         would sleep it) ; else -> A
-#   lid open, not kept awake -> B (idle sleep applies regardless of the lid)
+# Decide the mode. Idle sleep is the dominant constraint: closed-display
+# (clamshell) mode only protects the lid-close path, NOT the idle timer, so it
+# never makes the Mac "stay awake" on its own — only a permanent holder (or a
+# disabled idle timer), i.e. STAY_WHY, does.
+#   kept awake (STAY_WHY set):
+#     lid open AND closing it would sleep -> C (the lid is the one thing that
+#                                            would sleep it) ; else -> A
+#   not kept awake -> B (idle-sleeps after IDLE_SLEEP min, regardless of the lid
+#                        or clamshell state)
 # ============================================================================
 MODE=""
 AWAKE_WHY=""   # reason phrase for the Mode A "keep running" line
 
-if [ "$LID" = "Yes" ] && [ "$CLAM_SLEEP" = "No" ]; then
-    MODE="A"
-    AWAKE_WHY="lid closed in clamshell mode"
-elif [ -n "$STAY_WHY" ]; then
-    if [ "$CLAM_SLEEP" = "Yes" ]; then
+if [ -n "$STAY_WHY" ]; then
+    if [ "$LID" = "No" ] && [ "$CLAM_SLEEP" = "Yes" ]; then
         MODE="C"
     else
         MODE="A"
