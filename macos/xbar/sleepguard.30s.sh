@@ -23,6 +23,9 @@
 #   B  Will sleep      — idle sleep kicks in after ~N min; the lid is irrelevant.
 #   C  Sleeps on close — it would stay running, but closing the lid (no external
 #                        display on power) is the one thing that sleeps it.
+# Lid presence and battery presence are detected independently (HAS_LID / HAS_BATTERY).
+# A lidless desktop (Mac mini/Studio/iMac/Mac Pro) only ever sees A or B — Mode C and
+# every lid note are skipped — and its always-on-AC power state is hidden entirely.
 #
 # Dropdown layout (top to bottom):
 #   1. Reason section      — the title spelled out: what keeps it running / when
@@ -38,7 +41,9 @@
 #   closed-display-mode requirement: an external display is always required, and
 #   power too — but only on Intel. Apple's docs list a power adapter as required,
 #   yet Apple Silicon (M-series) Macs are widely tested to stay running clamshell
-#   on battery, so we drop the power condition there. We do NOT read ioreg
+#   on battery, so we drop the power condition there. This rule runs only when
+#   HAS_LID=yes, so it never touches a lidless desktop; and the Apple Silicon
+#   relaxation only matters for a lidded Mac running on battery. We do NOT read ioreg
 #   AppleClamshellCausesSleep: while the lid is open it tracks transient display-on
 #   state and flip-flops, so it mispredicts what closing the lid will do.
 # ============================================================================
@@ -100,8 +105,29 @@ IOREG=$(ioreg -r -k AppleClamshellState -d 4 2>/dev/null)
 getlive()  { echo "$LIVE"  | awk -v k="$1" '$1==k {print $2; exit}'; }
 clamval()  { echo "$IOREG" | grep "\"$1\"" | head -1 | sed -E 's/.*= //' | tr -d ' \t'; }
 
-# Power source
-if echo "$BATT" | grep -q "'AC Power'"; then SRC="AC"; else SRC="BATT"; fi
+# Hardware shape — two independent (orthogonal) traits. Today's Mac line-up binds
+# them (laptops have both, desktops neither), but each rides its own signal:
+#   HAS_LID     — does the Mac have a display lid? The AppleClamshellState ioreg key
+#                 is published only by lidded devices, so its mere presence is a
+#                 reliable lid test. Gates all clamshell/lid logic below.
+#   HAS_BATTERY — is an internal battery installed? Gates power handling: a
+#                 batteryless desktop is always on AC, and power then has no bearing
+#                 on sleep, so we don't even show it.
+if printf '%s' "$IOREG" | grep -q AppleClamshellState; then HAS_LID="yes"; else HAS_LID="no"; fi
+if ioreg -rc AppleSmartBattery 2>/dev/null | grep -q '"BatteryInstalled" = Yes'; then
+    HAS_BATTERY="yes"
+else
+    HAS_BATTERY="no"
+fi
+
+# Power source. With no battery the Mac is always on AC; otherwise read it live.
+if [ "$HAS_BATTERY" = "no" ]; then
+    SRC="AC"
+elif echo "$BATT" | grep -q "'AC Power'"; then
+    SRC="AC"
+else
+    SRC="BATT"
+fi
 
 # CPU architecture. Apple Silicon (arm64) relaxes the clamshell power requirement
 # (see the clamshell logic below); Intel still needs AC to run with the lid shut.
@@ -141,21 +167,26 @@ else
     IDLE_SLEEP="$DISPLAYSLEEP"
 fi
 
-# Lid state (from ioreg): AppleClamshellState — Yes = lid closed, No = lid open.
-# A direct hardware state, reliable.
-LID=$(clamval AppleClamshellState)
-[ -z "$LID" ] && LID="No"
-
-# Will closing the lid force sleep? Derived from Apple's closed-display-mode
-# requirement: always needs an external display; needs power too on Intel, but not
-# on Apple Silicon (Apple still officially lists power as required, yet M-series
-# Macs are widely tested to stay running clamshell on battery). Otherwise the lid
-# sleeps. (We avoid ioreg AppleClamshellCausesSleep — it flip-flops while the lid
-# is open; see the clamshell note in the header.)
-if [ "$EXT_DISPLAY" = "yes" ] && { [ "$SRC" = "AC" ] || [ "$ARCH" = "Apple Silicon" ]; }; then
-    CLAM_SLEEP="No"   # closed-display (clamshell) mode keeps it running
+# Lid state and clamshell behavior — only meaningful on devices with a lid.
+# LID (from ioreg): AppleClamshellState — Yes = lid closed, No = lid open; a direct,
+# reliable hardware state. CLAM_SLEEP answers "would closing the lid sleep the Mac?",
+# derived from Apple's closed-display-mode requirement: always needs an external
+# display; needs power too on Intel, but not on Apple Silicon (Apple still officially
+# lists power as required, yet M-series Macs are widely tested to stay running
+# clamshell on battery). (We avoid ioreg AppleClamshellCausesSleep — it flip-flops
+# while the lid is open; see the clamshell note in the header.) On a lidless desktop
+# both are inert: there is no lid to close, so the whole clamshell path is skipped.
+if [ "$HAS_LID" = "yes" ]; then
+    LID=$(clamval AppleClamshellState)
+    [ -z "$LID" ] && LID="No"
+    if [ "$EXT_DISPLAY" = "yes" ] && { [ "$SRC" = "AC" ] || [ "$ARCH" = "Apple Silicon" ]; }; then
+        CLAM_SLEEP="No"   # closed-display (clamshell) mode keeps it running
+    else
+        CLAM_SLEEP="Yes"  # closing the lid sleeps
+    fi
 else
-    CLAM_SLEEP="Yes"  # closing the lid sleeps
+    LID="No"          # no lid; treat as "not closed" so the mode logic stays clean
+    CLAM_SLEEP="No"   # no lid-close path to sleep through
 fi
 
 # ============================================================================
@@ -245,7 +276,7 @@ MODE=""
 AWAKE_WHY=""   # reason phrase for the Mode A "keep running" line
 
 if [ -n "$STAY_WHY" ]; then
-    if [ "$LID" = "No" ] && [ "$CLAM_SLEEP" = "Yes" ]; then
+    if [ "$HAS_LID" = "yes" ] && [ "$LID" = "No" ] && [ "$CLAM_SLEEP" = "Yes" ]; then
         MODE="C"
     else
         MODE="A"
@@ -262,15 +293,18 @@ case "$MODE" in
     A)
         echo "🟢 Staying awake"
         REASON="🟢 Background apps keep running${AWAKE_WHY:+ ($AWAKE_WHY)}"
-        # A lid that would sleep is classified as Mode C, so in Mode A the lid is
-        # always clamshell-safe: open -> a forward-looking note, closed -> confirm
-        # it's currently running with the lid shut.
-        if [ "$LID" = "No" ]; then
-            REASON="$REASON
+        # Lid note only applies to devices with a lid. A lid that would sleep is
+        # classified as Mode C, so in Mode A the lid is always clamshell-safe:
+        # open -> a forward-looking note, closed -> confirm it's running with the
+        # lid shut. A lidless desktop gets no lid line at all.
+        if [ "$HAS_LID" = "yes" ]; then
+            if [ "$LID" = "No" ]; then
+                REASON="$REASON
 🟢 Closing the lid also keeps it running"
-        else
-            REASON="$REASON
+            else
+                REASON="$REASON
 🟢 Running with the lid closed"
+            fi
         fi
         ;;
     B)
@@ -291,7 +325,12 @@ echo "$REASON"
 # Info section — neutral state, same set in every mode
 # ============================================================================
 echo "---"
-echo "Power: $([ "$SRC" = "AC" ] && echo "AC" || echo "Battery") ($ARCH)"
+# Power line is only meaningful with a battery; a batteryless desktop is always on
+# AC and power then has no bearing on sleep, so we omit it entirely. The arch tag
+# rides along here because it only matters for the (lid-bound) clamshell rule.
+if [ "$HAS_BATTERY" = "yes" ]; then
+    echo "Power: $([ "$SRC" = "AC" ] && echo "AC" || echo "Battery") ($ARCH)"
+fi
 if [ "$EXT_DISPLAY" = "yes" ]; then
     echo "External display: ${EXT_NAMES:-connected}"
 else
@@ -324,5 +363,13 @@ fi
 # Extra actions
 # ============================================================================
 echo "---"
-echo "Open Battery Settings | shell=open param1=x-apple.systempreferences:com.apple.Battery-Settings.extension terminal=false"
+# The pane is "Battery" on laptops but "Energy Saver" on batteryless desktops.
+# Battery uses the modern settings-extension anchor; Energy Saver keeps the legacy
+# prefpane identifier (System Settings still maps it). The desktop anchor is from a
+# community reference, not verified on desktop hardware here.
+if [ "$HAS_BATTERY" = "yes" ]; then
+    echo "Open Battery Settings | shell=open param1=x-apple.systempreferences:com.apple.Battery-Settings.extension terminal=false"
+else
+    echo "Open Energy Saver Settings | shell=open param1=x-apple.systempreferences:com.apple.preferences.EnergySaverPrefPane terminal=false"
+fi
 echo "Full pmset assertions | shell=/usr/bin/pmset param1=-g param2=assertions terminal=true"
