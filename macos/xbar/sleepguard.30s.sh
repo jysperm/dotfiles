@@ -29,23 +29,29 @@
 #
 # Dropdown layout (top to bottom):
 #   1. Reason section      — the title spelled out: what keeps it running / when
-#                            it sleeps, plus a lid-close note where useful.
+#                            it sleeps, plus a lid-close note where useful and, when
+#                            staying awake on battery, a battery-drain warning.
 #   2. Info section        — neutral state dump: power source, external display,
-#                            and what's holding sleep open — the permanent holders
-#                            if any, otherwise the temporary ones (flagged).
-#   3. Keep-awake control  — single caffeinate on/off toggle, independent of mode.
+#                            system-wide disablesleep state, and what's holding sleep
+#                            open — the permanent holders if any, else the temporary
+#                            ones (flagged).
+#   3. Keep-awake controls — a caffeinate on/off toggle and a system-wide disablesleep
+#                            on/off toggle, both independent of the reported mode.
 #   4. Extra actions       — open Battery settings, dump full pmset assertions.
 #
 # Clamshell note
-#   Whether closing the lid sleeps the Mac (CLAM_SLEEP) is derived from Apple's
-#   closed-display-mode requirement: an external display is always required, and
-#   power too — but only on Intel. Apple's docs list a power adapter as required,
-#   yet Apple Silicon (M-series) Macs are widely tested to stay running clamshell
-#   on battery, so we drop the power condition there. This rule runs only when
-#   HAS_LID=yes, so it never touches a lidless desktop; and the Apple Silicon
-#   relaxation only matters for a lidded Mac running on battery. We do NOT read ioreg
-#   AppleClamshellCausesSleep: while the lid is open it tracks transient display-on
-#   state and flip-flops, so it mispredicts what closing the lid will do.
+#   Whether closing the lid sleeps the Mac (CLAM_SLEEP) follows Apple's closed-
+#   display-mode requirement and what we measured on an M3 Pro (macOS 26): the lid
+#   stays "awake" closed only when (a) pmset disablesleep is on — the kernel master
+#   switch overrides the lid-close sleep (on AC always; on battery only for Apple
+#   Silicon — Intel is assumed to still need AC, untested as we have no Intel Mac),
+#   or (b) an external display is connected AND on AC (the ordinary supported setup).
+#   By DEFAULT (no disablesleep) a closed-lid Apple Silicon laptop on battery sleeps
+#   within ~1 min — this is measured, contradicting the widespread "M-series stays
+#   awake clamshell on battery" claim, and caffeinate does NOT prevent it. This rule
+#   runs only when HAS_LID=yes, so it never touches a lidless desktop. We do NOT read
+#   ioreg AppleClamshellCausesSleep: while the lid is open it tracks transient
+#   display-on state and flip-flops, so it mispredicts what closing the lid will do.
 # ============================================================================
 
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -78,6 +84,16 @@ case "$1" in
         ;;
     off)
         ka_stop
+        exit 0
+        ;;
+    disablesleep-on)
+        # Needs root; prompt via the native admin dialog (no sudoers editing).
+        # disablesleep (SleepDisabled) is global, so -a is the clearest scope.
+        osascript -e 'do shell script "/usr/bin/pmset -a disablesleep 1" with administrator privileges' >/dev/null 2>&1
+        exit 0
+        ;;
+    disablesleep-off)
+        osascript -e 'do shell script "/usr/bin/pmset -a disablesleep 0" with administrator privileges' >/dev/null 2>&1
         exit 0
         ;;
 esac
@@ -129,8 +145,9 @@ else
     SRC="BATT"
 fi
 
-# CPU architecture. Apple Silicon (arm64) relaxes the clamshell power requirement
-# (see the clamshell logic below); Intel still needs AC to run with the lid shut.
+# CPU architecture. Only matters for the clamshell rule below, and only alongside
+# disablesleep: with disablesleep on, an Apple Silicon laptop holds clamshell on
+# battery, whereas Intel is assumed to still need AC (untested — no Intel Mac here).
 if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then
     ARCH="Apple Silicon"
 else
@@ -149,6 +166,12 @@ EXT_NAMES=$(echo "$SPD" | awk '
 /Connection Type:[[:space:]]*Internal/ { if (cur!="") intl[cur]=1 }
 END { for (i=1;i<=c;i++) if (!intl[order[i]]) { if (out) out=out", "; out=out order[i] } print out }
 ')
+
+# pmset disablesleep — the kernel-level master switch (live key SleepDisabled). When
+# on, it blocks ALL system sleep (idle, clamshell, standby) on every power source,
+# overriding caffeinate and every timer below; it is the strongest keep-awake there
+# is. The key is absent from `pmset -g live` when off, so an empty value means "off".
+SLEEP_DISABLED=$(getlive SleepDisabled)
 
 # Idle-to-sleep time. The system can't idle-sleep while the display is on, so the
 # real wait before sleep is max(sleep, displaysleep) — both timers run off the same
@@ -169,18 +192,21 @@ fi
 
 # Lid state and clamshell behavior — only meaningful on devices with a lid.
 # LID (from ioreg): AppleClamshellState — Yes = lid closed, No = lid open; a direct,
-# reliable hardware state. CLAM_SLEEP answers "would closing the lid sleep the Mac?",
-# derived from Apple's closed-display-mode requirement: always needs an external
-# display; needs power too on Intel, but not on Apple Silicon (Apple still officially
-# lists power as required, yet M-series Macs are widely tested to stay running
-# clamshell on battery). (We avoid ioreg AppleClamshellCausesSleep — it flip-flops
-# while the lid is open; see the clamshell note in the header.) On a lidless desktop
-# both are inert: there is no lid to close, so the whole clamshell path is skipped.
+# reliable hardware state. CLAM_SLEEP answers "would closing the lid sleep the Mac?".
+# Closed-display (clamshell) mode keeps the Mac running only when disablesleep is on
+# (it overrides the lid-close sleep: AC always, battery only on Apple Silicon — Intel
+# assumed to still need AC), or an external display is connected AND on AC. Otherwise
+# closing the lid sleeps — including, by default, an Apple Silicon laptop on battery
+# (~1 min, measured; caffeinate does not save it). We avoid ioreg
+# AppleClamshellCausesSleep — it flip-flops while the lid is open; see the header
+# note. On a lidless desktop both are inert: no lid to close, so the path is skipped.
 if [ "$HAS_LID" = "yes" ]; then
     LID=$(clamval AppleClamshellState)
     [ -z "$LID" ] && LID="No"
-    if [ "$EXT_DISPLAY" = "yes" ] && { [ "$SRC" = "AC" ] || [ "$ARCH" = "Apple Silicon" ]; }; then
-        CLAM_SLEEP="No"   # closed-display (clamshell) mode keeps it running
+    if [ "$SLEEP_DISABLED" = "1" ] && { [ "$SRC" = "AC" ] || [ "$ARCH" = "Apple Silicon" ]; }; then
+        CLAM_SLEEP="No"   # disablesleep overrides the lid-close sleep
+    elif [ "$EXT_DISPLAY" = "yes" ] && [ "$SRC" = "AC" ]; then
+        CLAM_SLEEP="No"   # ordinary closed-display mode, on power
     else
         CLAM_SLEEP="Yes"  # closing the lid sleeps
     fi
@@ -206,6 +232,17 @@ KEEPAWAKE_RE='Coffee Buzz|Amphetamine|Caffeine|KeepingYouAwake|caffeinate|Lungo|
 PERM_HOLDERS=""   # newline-separated process names (indefinite holders)
 TEMP_HOLDERS=""   # newline-separated process names (self-releasing holders)
 
+# A keep-awake holder only works while the Mac CAN stay awake; the one thing that
+# overrides it is the closed-lid (clamshell) standby path. So a holder counts only when
+# the lid is open OR closing it would not sleep (CLAM_SLEEP=No, i.e. external-display+AC
+# or disablesleep) — exactly the condition under which the Mac stays awake closed. It is
+# voided only when the lid is closed AND that closure sleeps (CLAM_SLEEP=Yes): there a
+# power-assertion hold does not survive (measured with caffeinate; every keep-awake we
+# detect is just such an assertion — we only parse "SystemSleep named:" assertions), so
+# only disablesleep holds. LID_SLEEPS marks that override state.
+LID_SLEEPS="no"
+[ "$HAS_LID" = "yes" ] && [ "$LID" = "Yes" ] && [ "$CLAM_SLEEP" = "Yes" ] && LID_SLEEPS="yes"
+
 # A caffeinate is permanent only if its args carry no timeout (-t), no
 # wait-for-pid (-w) and no trailing command — i.e. only boolean flags. If the
 # process is already gone, treat it as temporary (don't claim "staying awake").
@@ -226,7 +263,8 @@ while IFS='|' read -r pid pname desc; do
     [ -z "$pname" ] && continue
     echo "$desc" | grep -qi "display is on" && continue
     if echo "$pname" | grep -qiE "$KEEPAWAKE_RE" \
-       && ! { [ "$pname" = "caffeinate" ] && [ "$(caffeinate_is_permanent "$pid")" != "yes" ]; }; then
+       && ! { [ "$pname" = "caffeinate" ] && [ "$(caffeinate_is_permanent "$pid")" != "yes" ]; } \
+       && [ "$LID_SLEEPS" != "yes" ]; then
         PERM_HOLDERS="$PERM_HOLDERS$pname
 "
     else
@@ -242,10 +280,18 @@ done <<< "$(echo "$ASSERT" | awk '
 }
 ')"
 
-# Short phrase for why the Mac will stay awake (also: non-empty = "staying
-# awake"). Only permanent holders / disabled timers count here.
+# Short phrase for why the Mac will stay awake (non-empty = "staying awake"), ordered
+# strongest-first. disablesleep holds in every state. When the lid is closed and that
+# sleeps it (LID_SLEEPS) nothing else survives the clamshell standby path — holders are
+# demoted above and the idle-path timers (sleep=0 / displaysleep=0) don't hold either —
+# so we stop at disablesleep there. Otherwise a disabled idle/display timer or a
+# permanent holder counts.
 STAY_WHY=""
-if [ "$SLEEP" = "0" ]; then
+if [ "$SLEEP_DISABLED" = "1" ]; then
+    STAY_WHY="system-wide disablesleep enabled"
+elif [ "$LID_SLEEPS" = "yes" ]; then
+    STAY_WHY=""   # lid closed & it sleeps: only disablesleep (handled above) holds
+elif [ "$SLEEP" = "0" ]; then
     STAY_WHY="idle sleep is disabled"
 elif [ "$DISPLAYSLEEP" = "0" ]; then
     STAY_WHY="display sleep disabled"
@@ -253,9 +299,10 @@ elif [ -n "$PERM_HOLDERS" ]; then
     STAY_WHY="kept awake by $(echo "$PERM_HOLDERS" | head -1)"
 fi
 
-# Reason phrase shown in the "keep running" line. If our own caffeinate toggle is
-# the holder, name it explicitly; otherwise use the detected reason.
-if [ "$KA_ACTIVE" = "1" ]; then
+# Reason phrase shown in the "keep running" line. disablesleep is the strongest
+# guarantee, so name it whenever it's on; else, if our own caffeinate toggle is the
+# holder, name it explicitly; else fall back to the detected reason.
+if [ "$KA_ACTIVE" = "1" ] && [ "$SLEEP_DISABLED" != "1" ]; then
     KEEP_WHY="caffeinate enabled"
 else
     KEEP_WHY="$STAY_WHY"
@@ -264,8 +311,8 @@ fi
 # ============================================================================
 # Decide the mode. Idle sleep is the dominant constraint: closed-display
 # (clamshell) mode only protects the lid-close path, NOT the idle timer, so it
-# never makes the Mac "stay awake" on its own — only a permanent holder (or a
-# disabled idle timer), i.e. STAY_WHY, does.
+# never makes the Mac "stay awake" on its own — only a permanent holder, a disabled
+# sleep timer, or system-wide disablesleep, i.e. STAY_WHY, does.
 #   kept awake (STAY_WHY set):
 #     lid open AND closing it would sleep -> C (the lid is the one thing that
 #                                            would sleep it) ; else -> A
@@ -318,6 +365,12 @@ case "$MODE" in
         ;;
 esac
 
+# Staying awake (Mode A/C) on battery drains it — warn that it will sleep once empty.
+if { [ "$MODE" = "A" ] || [ "$MODE" = "C" ]; } && [ "$SRC" = "BATT" ]; then
+    REASON="$REASON
+🔋 The battery may run out"
+fi
+
 echo "---"
 echo "$REASON"
 
@@ -336,6 +389,7 @@ if [ "$EXT_DISPLAY" = "yes" ]; then
 else
     echo "No external display"
 fi
+echo "System-wide disablesleep: $([ "$SLEEP_DISABLED" = "1" ] && echo "On" || echo "Off")"
 # Holders of system sleep. Prefer the permanent ones (what actually keeps it
 # awake); only when there are none do we surface the temporary ones, flagged as
 # such since they don't survive you walking away. Duplicates are kept on purpose
@@ -350,13 +404,23 @@ elif [ -n "$TEMP_LIST" ]; then
 fi
 
 # ============================================================================
-# Keep-awake control — single on/off toggle, independent of mode
+# Keep-awake controls. Two levers, each for a different need:
+#   caffeinate   — light, user-level, no admin; blocks idle sleep. Effective on AC
+#                  (and battery with the lid open), but NOT battery + lid closed.
+#   disablesleep — the kernel master switch; the only thing that holds on battery in
+#                  clamshell. Needs admin (osascript prompts), is global, and never
+#                  lets the Mac sleep until you turn it back off — so use sparingly.
 # ============================================================================
 echo "---"
 if [ "$KA_ACTIVE" = "1" ]; then
     echo "☕ Turn off caffeinate | shell=\"$SELF\" param1=off terminal=false refresh=true"
 else
     echo "💤 Turn on caffeinate | shell=\"$SELF\" param1=on terminal=false refresh=true"
+fi
+if [ "$SLEEP_DISABLED" = "1" ]; then
+    echo "🛡️ Turn off system-wide disablesleep | shell=\"$SELF\" param1=disablesleep-off terminal=false refresh=true"
+else
+    echo "🛡️ Force system-wide disablesleep | shell=\"$SELF\" param1=disablesleep-on terminal=false refresh=true"
 fi
 
 # ============================================================================
